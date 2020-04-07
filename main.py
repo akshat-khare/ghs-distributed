@@ -6,6 +6,9 @@ class Node:
     def __init__(self, infoStart):
         self.uid = infoStart.uid
         self.edges = infoStart.edges
+        self.edgeToWeight = {}
+        for i,j in self.edges:
+            self.edgeToWeight[i] = j
         self.queues = infoStart.queues
         self.queue = infoStart.queue
         self.masterQueue = infoStart.masterQueue
@@ -15,27 +18,74 @@ class Node:
             self.SE[i] = "Basic"
 
     def wakeup(self):
-        m = self.findMinEdgeAll()
+        m = self.findMinEdge()
         self.SE[m] = "Branch"
         self.LN = 0
         self.SN = "Found"
         self.findCount = 0
-        # send(Connect(0),m)
-        self.masterQueue.put(Message("done",[]))
-        sys.exit()
+        send(Connect(0),m)
+        self.queues[m].put(Message("connect",[0], self.uid))
+        # self.masterQueue.put(Message("done",[], self.uid)) #just for seeing if code works
+        # sys.exit() #just for seeing if code works
     def receiveAndProcess(self):
         while(True):
             message = self.queue.get()
             self.processMessage(message)
     def processMessage(self, message):
         typemessage = message.typemessage
+        senderid = message.senderid
+        metadata = message.metadata
         if typemessage=="wakeup":
             self.wakeup()
+        elif typemessage=="connect":
+            self.connect(metadata[0], senderid, message)
+        elif typemessage=="initiate":
+            self.initiate(metadata[0], metadata[1], metadata[2], senderid)
         else:
             print("Unrecognised message")
 
-    def findMinEdgeAll(self):
-        return self.edges[0][0]
+    def findMinEdge(self):
+        minEdge = self.edges[0][0]
+        minEdgeWeight = self.edges[0][1]
+        for i,j in self.edges:
+            if j<minEdgeWeight:
+                minEdge = i
+                minEdgeWeight = j
+        return minEdge
+
+    def connect(self, level, senderEdge, message):
+        if(self.SN=="Sleeping"):
+            self.wakeup()
+        if(level<self.LN):
+            self.SE[senderEdge] = "Branch"
+            self.queues[senderEdge].put(Message("initiate", [self.LN, self.FN, self.SN], self.uid))
+            if self.SN== "Find":
+                self.findCount +=1
+        elif(self.SE[senderEdge]=="Basic"):
+            self.queue.put(message)
+        else:
+            self.queues[senderEdge].put(Message("initiate", [self.LN+1, self.edgeToWeight[senderEdge], "Find"], self.uid))
+
+    def initiate(self, level, fid, status, senderEdge):
+        self.LN = level
+        self.FN = fid
+        self.SN = status
+        self.inBranch = senderEdge
+        self.bestEdge = None
+        self.bestWeight = float('inf')
+        for i,_ in self.edges:
+            if i==senderEdge:
+                continue
+            if self.SE[i]!="Branch":
+                continue
+            self.queues[i].put(Message("initiate", [level, fid, status], self.uid))
+            if status=="Find":
+                self.findCount+=1
+        if status=="Find":
+            self.test()
+
+    def test(self):
+        pass
 
 
 class InfoStart:
@@ -53,9 +103,10 @@ def nodecode(infoStart):
 
 class Message():
     """docstring for Message"""
-    def __init__(self, typemessage, metadata):
+    def __init__(self, typemessage, metadata, senderid):
         self.typemessage = typemessage
         self.metadata = metadata
+        self.senderid = senderid
 
         
 
@@ -77,14 +128,16 @@ if __name__ == '__main__':
     masterQueue = multiprocessing.Queue()
     processes = []
     for i in range(numNodes):
-        infoStart = InfoStart(i, adjacencyList[i], [nodesQueues[j] for j,k in adjacencyList[i]], nodesQueues[i], masterQueue)
+        queuedic = {}
+        for j,k in adjacencyList[i]:
+            queuedic[j] = nodesQueues[j]
+        infoStart = InfoStart(i, adjacencyList[i], queuedic, nodesQueues[i], masterQueue)
         p = multiprocessing.Process(target=nodecode, args=(infoStart,))
         p.start()
         processes.append(p)
-    nodesQueues[0].put(Message("wakeup",[]))
     for i in range(numNodes):
-        nodesQueues[i].put(Message("wakeup",[]))
+        nodesQueues[i].put(Message("wakeup",[], -1))
     for i in range(numNodes):
         recvmessage = masterQueue.get()
-        print(recvmessage.typemessage, recvmessage.metadata)
+        print(recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
 
