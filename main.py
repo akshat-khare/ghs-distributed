@@ -23,7 +23,6 @@ class Node:
         self.LN = 0
         self.SN = "Found"
         self.findCount = 0
-        send(Connect(0),m)
         self.queues[m].put(Message("connect",[0], self.uid))
         # self.masterQueue.put(Message("done",[], self.uid)) #just for seeing if code works
         # sys.exit() #just for seeing if code works
@@ -41,6 +40,16 @@ class Node:
             self.connect(metadata[0], senderid, message)
         elif typemessage=="initiate":
             self.initiate(metadata[0], metadata[1], metadata[2], senderid)
+        elif typemessage=="test":
+            self.testResponse(metadata[0], metadata[1], senderid, message)
+        elif typemessage=="accept":
+            self.accept(senderid)
+        elif typemessage=="reject":
+            self.reject(senderid)
+        elif typemessage=="report":
+            self.reportResponse(metadata[0], senderid, message)
+        elif typemessage=="changeRoot":
+            self.changeRootResponse()
         else:
             print("Unrecognised message")
 
@@ -85,7 +94,84 @@ class Node:
             self.test()
 
     def test(self):
-        pass
+        havebasic = False
+        for i,j in self.edges:
+            if self.SE[i]=="Basic":
+                havebasic=True
+                m = self.findMinBasicEdge()
+                self.test_edge = m
+                self.queues[m].put(Message("test",[self.LN, self.FN], self.uid))
+                break
+        if(not havebasic):
+            self.test_edge = None
+            self.report()
+
+    def findMinBasicEdge(self):
+        minEdge = -1
+        minEdgeWeight = float('inf')
+        for i, j in self.edges:
+            if j < minEdgeWeight and self.SE[i]=="Basic":
+                minEdge = i
+                minEdgeWeight = j
+        return minEdge
+
+
+    def testResponse(self, level, fid, senderEdge, message):
+        if self.SN=="Sleeping":
+            self.wakeup()
+        if level>self.LN:
+            self.queue.put(message)
+        elif self.FN != fid:
+            self.queues[senderEdge].put(Message("accept", [], self.uid))
+        else:
+            if self.SE[senderEdge] == "Basic":
+                self.SE[senderEdge] = "Rejected"
+            if (self.test_edge is None or self.test_edge != senderEdge):
+                self.queues[senderEdge].put(Message("reject", [], self.uid))
+            else:
+                self.test()
+
+    def accept(self, senderEdge):
+        self.test_edge = None
+        if self.edgeToWeight[senderEdge]<self.bestWeight:
+            self.bestEdge = senderEdge
+            self.bestWeight = self.edgeToWeight[senderEdge]
+        self.report()
+
+    def reject(self, senderEdge):
+        if self.SE[senderEdge] == "Basic":
+            self.SE[senderEdge] = "Rejected"
+        self.test()
+
+    def report(self):
+        if self.findCount==0 and self.test_edge is None:
+            self.SN = "Found"
+            self.queues[self.inBranch].put(Message("report", [self.bestWeight], self.uid))
+
+    def reportResponse(self, weightparam, senderEdge, message):
+        if senderEdge!=self.inBranch:
+            self.findCount-=1
+            if weightparam<self.bestWeight:
+                self.bestWeight = weightparam
+                self.bestEdge = senderEdge
+            self.report()
+        elif self.SN=="Find":
+            self.queue.put(message)
+        elif weightparam > self.bestWeight:
+            self.changeRoot()
+        elif weightparam == self.bestWeight and self.bestWeight == float('inf'):
+            self.masterQueue.put(Message("done", [], self.uid))
+            sys.exit()
+
+    def changeRoot(self):
+        if self.SE[self.bestEdge] == "Branch":
+            self.queues[self.bestEdge].put(Message("changeRoot",[],self.uid))
+        else:
+            self.queues[self.bestEdge].put(Message("connect", [self.LN], self.uid))
+            self.SE[self.bestEdge] = "Branch"
+
+    def changeRootResponse(self):
+        self.changeRoot()
 
 
 class InfoStart:
@@ -96,6 +182,7 @@ class InfoStart:
         self.queues = queues
         self.queue = queue
         self.masterQueue = masterQueue
+
 def nodecode(infoStart):
     node = Node(infoStart)
     node.receiveAndProcess()
