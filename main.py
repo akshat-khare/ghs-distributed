@@ -2,6 +2,7 @@ import numpy as np
 import multiprocessing
 import sys
 from kruskal import Graph
+DEBUG = False
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -35,7 +36,7 @@ class Node:
         typemessage = message.typemessage
         senderid = message.senderid
         metadata = message.metadata
-        # print("Process ", self.uid, "received ", typemessage, "from " , senderid, "with metadata ", metadata)
+        # if DEBUG: print("Process ", self.uid, "received ", typemessage, "from " , senderid, "with metadata ", metadata)
         if typemessage=="wakeup":
             self.wakeup()
         elif typemessage=="connect":
@@ -55,7 +56,7 @@ class Node:
         elif typemessage=="queryStatus":
             self.queryStatusResponse()
         else:
-            print("Unrecognised message")
+            if DEBUG: print("Unrecognised message")
 
     def findMinEdge(self):
         minEdge = self.edges[0][0]
@@ -153,7 +154,7 @@ class Node:
             self.queues[self.inBranch].put(Message("report", [self.bestWeight], self.uid))
 
     def reportResponse(self, weightparam, senderEdge, message):
-        # print("Process ", self.uid,"report response")
+        # if DEBUG: print("Process ", self.uid,"report response")
         if senderEdge!=self.inBranch:
             self.findCount-=1
             if weightparam<self.bestWeight:
@@ -218,7 +219,7 @@ if __name__ == '__main__':
     # testEdges = [(0,1,1),(1,2,2),(2,0,3)]
     # testNodes = 2
     # testEdges = [(0, 1, 1)]
-    numNodes, testEdges = readInput("input.txt")
+    numNodes, testEdges = readInput("sample_inp.txt")
     adjacencyMatrix = np.zeros((numNodes,numNodes))
     for i,j,k in testEdges:
         adjacencyMatrix[i][j] = k
@@ -245,7 +246,7 @@ if __name__ == '__main__':
     # while(True):
     # for i in range(numNodes):
     #     recvmessage = masterQueue.get()
-    #     print(recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+    #     if DEBUG: print(recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
     recvmessage = masterQueue.get()
     if recvmessage.typemessage=="done":
         for i in range(numNodes):
@@ -255,8 +256,8 @@ if __name__ == '__main__':
     while(numStatusMessages<numNodes):
         recvmessage = masterQueue.get()
         if recvmessage.typemessage=="queryAnswer":
-            # print("Got status")
-            print("Got status", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+            # if DEBUG: print("Got status")
+            if DEBUG: print("Got status", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
             SEstatus = recvmessage.metadata[0]
             for i,j in SEstatus.items():
                 if j=="Branch":
@@ -264,15 +265,34 @@ if __name__ == '__main__':
                     mstAdjacencyMatrix[i][recvmessage.senderid] = 1
             numStatusMessages+=1
         else:
-            # print("some other message")
-            print("some other message", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+            # if DEBUG: print("some other message")
+            if DEBUG: print("some other message", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+
+
+    def formatNumber(num):
+        if num % 1 == 0:
+            return int(num)
+        else:
+            return num
+    mstEdges = []
+    for i in range(numNodes):
+        for j in range(i+1,numNodes):
+            if mstAdjacencyMatrix[i][j] == 1:
+                mstEdges.append((i, j, formatNumber(adjacencyMatrix[i][j])))
+    def sortfn(e):
+        return e[2]
+    mstEdges.sort(reverse=False,key = sortfn)
+    for i in mstEdges:
+        print(i)
+
+
 
     #kruskal
     g = Graph(numNodes)
     for i in testEdges:
         g.addEdge(i[0],i[1],i[2])
     kruskalmst = g.KruskalMST()
-    print("kruskal answer is ", kruskalmst)
+    if DEBUG: print("kruskal answer is ", kruskalmst)
     kruskalMstAdjacencyMatrix = np.zeros((numNodes, numNodes))
     for i,j,k in kruskalmst:
         kruskalMstAdjacencyMatrix[i][j] = 1
@@ -285,7 +305,8 @@ if __name__ == '__main__':
                 break
         if(not isVerified):
             break
-    print("GHS is ", isVerified)
+    if DEBUG: print("GHS is ", isVerified)
+
 
 
 

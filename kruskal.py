@@ -87,7 +87,7 @@ class Graph:
                 # Else discard the edge
 
         # print the contents of result[] to display the built MST
-        print("Following are the edges in the constructed MST")
+        # print("Following are the edges in the constructed MST")
         # for u, v, weight in result:
         #     # print str(u) + " -- " + str(v) + " == " + str(weight)
         #     print("%d -- %d == %d" % (u, v, weight))
