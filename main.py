@@ -1,6 +1,7 @@
 import numpy as np
 import multiprocessing
 import sys
+from kruskal import Graph
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -34,6 +35,7 @@ class Node:
         typemessage = message.typemessage
         senderid = message.senderid
         metadata = message.metadata
+        # print("Process ", self.uid, "received ", typemessage, "from " , senderid, "with metadata ", metadata)
         if typemessage=="wakeup":
             self.wakeup()
         elif typemessage=="connect":
@@ -50,6 +52,8 @@ class Node:
             self.reportResponse(metadata[0], senderid, message)
         elif typemessage=="changeRoot":
             self.changeRootResponse()
+        elif typemessage=="queryStatus":
+            self.queryStatusResponse()
         else:
             print("Unrecognised message")
 
@@ -149,6 +153,7 @@ class Node:
             self.queues[self.inBranch].put(Message("report", [self.bestWeight], self.uid))
 
     def reportResponse(self, weightparam, senderEdge, message):
+        # print("Process ", self.uid,"report response")
         if senderEdge!=self.inBranch:
             self.findCount-=1
             if weightparam<self.bestWeight:
@@ -160,8 +165,8 @@ class Node:
         elif weightparam > self.bestWeight:
             self.changeRoot()
         elif weightparam == self.bestWeight and self.bestWeight == float('inf'):
-            self.masterQueue.put(Message("done", [], self.uid))
-            sys.exit()
+            self.masterQueue.put(Message("done", [self.SE, self.inBranch], self.uid))
+            # sys.exit()
 
     def changeRoot(self):
         if self.SE[self.bestEdge] == "Branch":
@@ -172,6 +177,10 @@ class Node:
 
     def changeRootResponse(self):
         self.changeRoot()
+
+    def queryStatusResponse(self):
+        self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch], self.uid))
+        sys.exit()
 
 
 class InfoStart:
@@ -195,13 +204,21 @@ class Message():
         self.metadata = metadata
         self.senderid = senderid
 
-        
 
-        
+def readInput(filename):
+    f = open(filename, "r")
+    lines = f.readlines()
+    numNodes = int(lines[0])
+    testEdges = [eval(x.rstrip()) for x in lines[1:]]
+    return (numNodes, testEdges)
+
+
 if __name__ == '__main__':
-    testNodes = [0,1,2]
-    testEdges = [(0,1,1),(1,2,2),(2,0,3)]
-    numNodes = len(testNodes)
+    # testNodes = 3
+    # testEdges = [(0,1,1),(1,2,2),(2,0,3)]
+    # testNodes = 2
+    # testEdges = [(0, 1, 1)]
+    numNodes, testEdges = readInput("input.txt")
     adjacencyMatrix = np.zeros((numNodes,numNodes))
     for i,j,k in testEdges:
         adjacencyMatrix[i][j] = k
@@ -222,9 +239,53 @@ if __name__ == '__main__':
         p = multiprocessing.Process(target=nodecode, args=(infoStart,))
         p.start()
         processes.append(p)
-    for i in range(numNodes):
-        nodesQueues[i].put(Message("wakeup",[], -1))
-    for i in range(numNodes):
+    nodesQueues[0].put(Message("wakeup", [], -1))
+    # for i in range(numNodes):
+    #     nodesQueues[i].put(Message("wakeup",[], -1))
+    # while(True):
+    # for i in range(numNodes):
+    #     recvmessage = masterQueue.get()
+    #     print(recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+    recvmessage = masterQueue.get()
+    if recvmessage.typemessage=="done":
+        for i in range(numNodes):
+            nodesQueues[i].put(Message("queryStatus",[], -1))
+    numStatusMessages = 0
+    mstAdjacencyMatrix = np.zeros((numNodes,numNodes))
+    while(numStatusMessages<numNodes):
         recvmessage = masterQueue.get()
-        print(recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+        if recvmessage.typemessage=="queryAnswer":
+            # print("Got status")
+            print("Got status", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+            SEstatus = recvmessage.metadata[0]
+            for i,j in SEstatus.items():
+                if j=="Branch":
+                    mstAdjacencyMatrix[recvmessage.senderid][i] = 1
+                    mstAdjacencyMatrix[i][recvmessage.senderid] = 1
+            numStatusMessages+=1
+        else:
+            # print("some other message")
+            print("some other message", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
+
+    #kruskal
+    g = Graph(numNodes)
+    for i in testEdges:
+        g.addEdge(i[0],i[1],i[2])
+    kruskalmst = g.KruskalMST()
+    print("kruskal answer is ", kruskalmst)
+    kruskalMstAdjacencyMatrix = np.zeros((numNodes, numNodes))
+    for i,j,k in kruskalmst:
+        kruskalMstAdjacencyMatrix[i][j] = 1
+        kruskalMstAdjacencyMatrix[j][i] = 1
+    isVerified = True
+    for i in range(numNodes):
+        for j in range(numNodes):
+            if(kruskalMstAdjacencyMatrix[i][j]!=mstAdjacencyMatrix[i][j]):
+                isVerified=False
+                break
+        if(not isVerified):
+            break
+    print("GHS is ", isVerified)
+
+
 
