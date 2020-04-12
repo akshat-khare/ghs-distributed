@@ -2,7 +2,7 @@ import numpy as np
 import multiprocessing
 import sys
 from kruskal import Graph
-DEBUG = False
+DEBUG = True
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -36,7 +36,7 @@ class Node:
         typemessage = message.typemessage
         senderid = message.senderid
         metadata = message.metadata
-        # if DEBUG: print("Process ", self.uid, "received ", typemessage, "from " , senderid, "with metadata ", metadata)
+        if DEBUG: print("Process ", self.uid, "received ", typemessage, "from " , senderid, "with metadata ", metadata)
         if typemessage=="wakeup":
             self.wakeup()
         elif typemessage=="connect":
@@ -241,6 +241,7 @@ if __name__ == '__main__':
         p.start()
         processes.append(p)
     nodesQueues[0].put(Message("wakeup", [], -1))
+    if DEBUG: print("wakeup sent")
     # for i in range(numNodes):
     #     nodesQueues[i].put(Message("wakeup",[], -1))
     # while(True):
