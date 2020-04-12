@@ -2,7 +2,7 @@ import numpy as np
 import multiprocessing
 import sys
 from kruskal import Graph
-DEBUG = True
+DEBUG = False
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -73,7 +73,7 @@ class Node:
         if(level<self.LN):
             self.SE[senderEdge] = "Branch"
             self.queues[senderEdge].put(Message("initiate", [self.LN, self.FN, self.SN], self.uid))
-            if self.SN== "Find":
+            if self.SN== "Find" and self.inBranch!=senderEdge:
                 self.findCount +=1
         elif(self.SE[senderEdge]=="Basic"):
             self.queue.put(message)
