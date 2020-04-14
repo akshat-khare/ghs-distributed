@@ -2,7 +2,8 @@ import numpy as np
 import multiprocessing
 import sys
 from kruskal import Graph
-DEBUG = False
+DEBUG = True
+DEBUGOUTPUT = True
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -16,6 +17,7 @@ class Node:
         self.masterQueue = infoStart.masterQueue
         self.SN = "Sleeping"
         self.SE = {}
+        self.test_edge = None
         for i,j in self.edges:
             self.SE[i] = "Basic"
 
@@ -133,6 +135,18 @@ class Node:
                 self.SE[senderEdge] = "Rejected"
             if (self.test_edge is None or self.test_edge != senderEdge):
                 self.queues[senderEdge].put(Message("reject", [], self.uid))
+            # if (hasattr(self, 'test_edge')):
+            #     if self.test_edge != senderEdge:
+            #         self.queues[senderEdge].put(Message("reject", [], self.uid))
+            # elif self.test_edge != senderEdge:
+            #     self.queues[senderEdge].put(Message("reject", [], self.uid))
+            # else:
+            #     self.test()
+            # else:
+            #     if self.test_edge != senderEdge:
+            #         self.queues[senderEdge].put(Message("reject", [], self.uid))
+            #     else:
+            #         self.test()
             else:
                 self.test()
 
@@ -149,7 +163,10 @@ class Node:
         self.test()
 
     def report(self):
+        # print("process ", self.uid, "call report")
         if self.findCount==0 and self.test_edge is None:
+        # if self.findCount==0 and (not hasattr(self, 'test_edge')):
+            # print("process ", self.uid, "entered report", (not hasattr(self, 'test_edge')), self.test_edge)
             self.SN = "Found"
             self.queues[self.inBranch].put(Message("report", [self.bestWeight], self.uid))
 
@@ -219,7 +236,7 @@ if __name__ == '__main__':
     # testEdges = [(0,1,1),(1,2,2),(2,0,3)]
     # testNodes = 2
     # testEdges = [(0, 1, 1)]
-    numNodes, testEdges = readInput("sample_inp.txt")
+    numNodes, testEdges = readInput(sys.argv[1])
     adjacencyMatrix = np.zeros((numNodes,numNodes))
     for i,j,k in testEdges:
         adjacencyMatrix[i][j] = k
@@ -287,26 +304,26 @@ if __name__ == '__main__':
         print(i)
 
 
-
-    #kruskal
-    g = Graph(numNodes)
-    for i in testEdges:
-        g.addEdge(i[0],i[1],i[2])
-    kruskalmst = g.KruskalMST()
-    if DEBUG: print("kruskal answer is ", kruskalmst)
-    kruskalMstAdjacencyMatrix = np.zeros((numNodes, numNodes))
-    for i,j,k in kruskalmst:
-        kruskalMstAdjacencyMatrix[i][j] = 1
-        kruskalMstAdjacencyMatrix[j][i] = 1
-    isVerified = True
-    for i in range(numNodes):
-        for j in range(numNodes):
-            if(kruskalMstAdjacencyMatrix[i][j]!=mstAdjacencyMatrix[i][j]):
-                isVerified=False
+    if DEBUGOUTPUT:
+        #kruskal
+        g = Graph(numNodes)
+        for i in testEdges:
+            g.addEdge(i[0],i[1],i[2])
+        kruskalmst = g.KruskalMST()
+        if DEBUG: print("kruskal answer is ", kruskalmst)
+        kruskalMstAdjacencyMatrix = np.zeros((numNodes, numNodes))
+        for i,j,k in kruskalmst:
+            kruskalMstAdjacencyMatrix[i][j] = 1
+            kruskalMstAdjacencyMatrix[j][i] = 1
+        isVerified = True
+        for i in range(numNodes):
+            for j in range(numNodes):
+                if(kruskalMstAdjacencyMatrix[i][j]!=mstAdjacencyMatrix[i][j]):
+                    isVerified=False
+                    break
+            if(not isVerified):
                 break
-        if(not isVerified):
-            break
-    if DEBUG: print("GHS is ", isVerified)
+        print("GHS is ", isVerified)
 
 
 
