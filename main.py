@@ -2,7 +2,7 @@ import numpy as np
 import multiprocessing
 import sys
 from kruskal import Graph
-DEBUG = True
+DEBUG = False
 DEBUGOUTPUT = True
 class Node:
     """docstring for Node"""
