@@ -7,17 +7,17 @@ DEBUGOUTPUT = True
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
-        self.uid = infoStart.uid
-        self.edges = infoStart.edges
-        self.edgeToWeight = {}
+        self.uid = infoStart.uid #unique identifier
+        self.edges = infoStart.edges #list of tuples of the form (nodeId, Weight)
+        self.edgeToWeight = {} #a dictionary for the fast retrieval of edgeWeight from NodeId
         for i,j in self.edges:
             self.edgeToWeight[i] = j
-        self.queues = infoStart.queues
-        self.queue = infoStart.queue
-        self.masterQueue = infoStart.masterQueue
-        self.SN = "Sleeping"
-        self.SE = {}
-        self.test_edge = None
+        self.queues = infoStart.queues #a dictionary of the messageQueue of the form (nodeId, queue)
+        self.queue = infoStart.queue #queue of the self
+        self.masterQueue = infoStart.masterQueue #queue of the master process which spawned all processes
+        self.SN = "Sleeping" #State of the Node
+        self.SE = {} #Dictionary of the form (nodeId, status of edge) used to get the status of edges
+        self.test_edge = None 
         for i,j in self.edges:
             self.SE[i] = "Basic"
 
@@ -32,7 +32,7 @@ class Node:
         # sys.exit() #just for seeing if code works
     def receiveAndProcess(self):
         while(True):
-            message = self.queue.get()
+            message = self.queue.get() #blocking receive
             self.processMessage(message)
     def processMessage(self, message):
         typemessage = message.typemessage
@@ -135,18 +135,6 @@ class Node:
                 self.SE[senderEdge] = "Rejected"
             if (self.test_edge is None or self.test_edge != senderEdge):
                 self.queues[senderEdge].put(Message("reject", [], self.uid))
-            # if (hasattr(self, 'test_edge')):
-            #     if self.test_edge != senderEdge:
-            #         self.queues[senderEdge].put(Message("reject", [], self.uid))
-            # elif self.test_edge != senderEdge:
-            #     self.queues[senderEdge].put(Message("reject", [], self.uid))
-            # else:
-            #     self.test()
-            # else:
-            #     if self.test_edge != senderEdge:
-            #         self.queues[senderEdge].put(Message("reject", [], self.uid))
-            #     else:
-            #         self.test()
             else:
                 self.test()
 
@@ -183,7 +171,7 @@ class Node:
         elif weightparam > self.bestWeight:
             self.changeRoot()
         elif weightparam == self.bestWeight and self.bestWeight == float('inf'):
-            self.masterQueue.put(Message("done", [self.SE, self.inBranch], self.uid))
+            self.masterQueue.put(Message("done", [self.SE, self.inBranch], self.uid)) #GHS is computed, inform master
             # sys.exit()
 
     def changeRoot(self):
@@ -198,17 +186,17 @@ class Node:
 
     def queryStatusResponse(self):
         self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch], self.uid))
-        sys.exit()
+        sys.exit() #MST computed and sent information to master, time to exit
 
 
 class InfoStart:
     """docstring for InfoStart"""
     def __init__(self, uid, edges, queues, queue, masterQueue):
-        self.uid = uid
-        self.edges = edges
-        self.queues = queues
-        self.queue = queue
-        self.masterQueue = masterQueue
+        self.uid = uid #Unique id
+        self.edges = edges #neighbouring edge and their weights
+        self.queues = queues #neighbouring edges queues
+        self.queue = queue #nodes own queue
+        self.masterQueue = masterQueue #master process queue
 
 def nodecode(infoStart):
     node = Node(infoStart)
@@ -218,9 +206,9 @@ def nodecode(infoStart):
 class Message():
     """docstring for Message"""
     def __init__(self, typemessage, metadata, senderid):
-        self.typemessage = typemessage
-        self.metadata = metadata
-        self.senderid = senderid
+        self.typemessage = typemessage #Type of message like wakeup, connect, etc
+        self.metadata = metadata #Any extra information bundled up with data
+        self.senderid = senderid #Id of whoever sent the message
 
 
 def readInput(filename):
@@ -246,18 +234,18 @@ if __name__ == '__main__':
         for j in range(numNodes):
             if(adjacencyMatrix[i][j]!=0):
                 adjacencyList[i].append((j,adjacencyMatrix[i][j]))
-    nodesQueues = [multiprocessing.Queue() for i in range(numNodes)]
-    masterQueue = multiprocessing.Queue()
+    nodesQueues = [multiprocessing.Queue() for i in range(numNodes)] #master process has queues of all of the nodes
+    masterQueue = multiprocessing.Queue() #master's own queue
     processes = []
     for i in range(numNodes):
-        queuedic = {}
+        queuedic = {} #node's relevent queue data
         for j,k in adjacencyList[i]:
-            queuedic[j] = nodesQueues[j]
+            queuedic[j] = nodesQueues[j] #only providing neighbouring edges queues
         infoStart = InfoStart(i, adjacencyList[i], queuedic, nodesQueues[i], masterQueue)
         p = multiprocessing.Process(target=nodecode, args=(infoStart,))
         p.start()
         processes.append(p)
-    nodesQueues[0].put(Message("wakeup", [], -1))
+    nodesQueues[0].put(Message("wakeup", [], -1))#waking up nodeId 0
     if DEBUG: print("wakeup sent")
     # for i in range(numNodes):
     #     nodesQueues[i].put(Message("wakeup",[], -1))
@@ -268,7 +256,7 @@ if __name__ == '__main__':
     recvmessage = masterQueue.get()
     if recvmessage.typemessage=="done":
         for i in range(numNodes):
-            nodesQueues[i].put(Message("queryStatus",[], -1))
+            nodesQueues[i].put(Message("queryStatus",[], -1)) #get Branch edges information
     numStatusMessages = 0
     mstAdjacencyMatrix = np.zeros((numNodes,numNodes))
     while(numStatusMessages<numNodes):
