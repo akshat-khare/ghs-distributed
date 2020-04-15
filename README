@@ -1,0 +1,2 @@
+pip install multiprocess numpy
+python main.py [name_of_input_file]
