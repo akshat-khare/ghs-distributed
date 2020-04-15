@@ -1,9 +1,8 @@
 import numpy as np
 import multiprocessing
 import sys
-from kruskal import Graph
 DEBUG = False
-DEBUGOUTPUT = True
+DEBUGOUTPUT = False
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -294,6 +293,7 @@ if __name__ == '__main__':
 
     if DEBUGOUTPUT:
         #kruskal
+        from kruskal import Graph
         g = Graph(numNodes)
         for i in testEdges:
             g.addEdge(i[0],i[1],i[2])
