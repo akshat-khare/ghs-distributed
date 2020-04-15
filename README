@@ -1,0 +1,4 @@
+pip install multiprocess numpy
+python main.py [name_of_input_file]
+
+Read the report for the algorithm and references.
