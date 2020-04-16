@@ -1,8 +1,10 @@
 import numpy as np
 import multiprocessing
 import sys
+import math
 DEBUG = False
 DEBUGOUTPUT = False
+ANALYSIS = False
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -19,6 +21,7 @@ class Node:
         self.test_edge = None 
         for i,j in self.edges:
             self.SE[i] = "Basic"
+        if ANALYSIS: self.numMessages = 0
 
     def wakeup(self):
         m = self.findMinEdge()
@@ -37,6 +40,9 @@ class Node:
         typemessage = message.typemessage
         senderid = message.senderid
         metadata = message.metadata
+        if ANALYSIS: 
+            if senderid!=self.uid:
+                self.numMessages += 1
         if DEBUG: print("Process ", self.uid, "received ", typemessage, "from " , senderid, "with metadata ", metadata)
         if typemessage=="wakeup":
             self.wakeup()
@@ -78,6 +84,7 @@ class Node:
                 self.findCount +=1
         elif(self.SE[senderEdge]=="Basic"):
             self.queue.put(message)
+            if ANALYSIS: self.numMessages-=1
         else:
             self.queues[senderEdge].put(Message("initiate", [self.LN+1, self.edgeToWeight[senderEdge], "Find"], self.uid))
 
@@ -127,6 +134,7 @@ class Node:
             self.wakeup()
         if level>self.LN:
             self.queue.put(message)
+            if ANALYSIS: self.numMessages-=1
         elif self.FN != fid:
             self.queues[senderEdge].put(Message("accept", [], self.uid))
         else:
@@ -167,6 +175,7 @@ class Node:
             self.report()
         elif self.SN=="Find":
             self.queue.put(message)
+            if ANALYSIS: self.numMessages-=1
         elif weightparam > self.bestWeight:
             self.changeRoot()
         elif weightparam == self.bestWeight and self.bestWeight == float('inf'):
@@ -184,7 +193,10 @@ class Node:
         self.changeRoot()
 
     def queryStatusResponse(self):
-        self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch], self.uid))
+        if ANALYSIS:
+            self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch, self.numMessages-1], self.uid))
+        else:
+            self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch], self.uid))
         sys.exit() #MST computed and sent information to master, time to exit
 
 
@@ -228,6 +240,11 @@ if __name__ == '__main__':
     for i,j,k in testEdges:
         adjacencyMatrix[i][j] = k
         adjacencyMatrix[j][i] = k
+    numEdgesReal = 0
+    for i in range(0, numNodes):
+        for j in range(i+1,numNodes):
+            if adjacencyMatrix[i][j] !=0:
+                numEdgesReal+=1
     adjacencyList = [[] for i in range(numNodes)]
     for i in range(numNodes):
         for j in range(numNodes):
@@ -258,12 +275,14 @@ if __name__ == '__main__':
             nodesQueues[i].put(Message("queryStatus",[], -1)) #get Branch edges information
     numStatusMessages = 0
     mstAdjacencyMatrix = np.zeros((numNodes,numNodes))
+    numTotalMessages = 0
     while(numStatusMessages<numNodes):
         recvmessage = masterQueue.get()
         if recvmessage.typemessage=="queryAnswer":
             # if DEBUG: print("Got status")
             if DEBUG: print("Got status", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
             SEstatus = recvmessage.metadata[0]
+            if ANALYSIS: numTotalMessages += recvmessage.metadata[2]
             for i,j in SEstatus.items():
                 if j=="Branch":
                     mstAdjacencyMatrix[recvmessage.senderid][i] = 1
@@ -290,7 +309,14 @@ if __name__ == '__main__':
     for i in mstEdges:
         print(i)
 
-
+    if ANALYSIS:
+        # print("Number of messsages is ", numTotalMessages)
+        # print(numTotalMessages)
+        upperLimit = 2*numEdgesReal + math.ceil(5*numNodes*math.log2(numNodes))
+        # print("upper limit is ", upperLimit)
+        # print(upperLimit)
+        print("n, edges, messages, upperlimit, nlogn")
+        print(numNodes,str(","),numEdgesReal,str(","), numTotalMessages,str(","), upperLimit,str(","), int(numNodes*math.log2(numNodes)))
     if DEBUGOUTPUT:
         #kruskal
         from kruskal import Graph
