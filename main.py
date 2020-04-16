@@ -4,7 +4,7 @@ import sys
 import math
 DEBUG = False
 DEBUGOUTPUT = False
-ANALYSIS = True
+ANALYSIS = False
 class Node:
     """docstring for Node"""
     def __init__(self, infoStart):
@@ -21,7 +21,7 @@ class Node:
         self.test_edge = None 
         for i,j in self.edges:
             self.SE[i] = "Basic"
-        self.numMessages = 0
+        if ANALYSIS: self.numMessages = 0
 
     def wakeup(self):
         m = self.findMinEdge()
@@ -40,8 +40,9 @@ class Node:
         typemessage = message.typemessage
         senderid = message.senderid
         metadata = message.metadata
-        if senderid!=self.uid:
-            self.numMessages += 1
+        if ANALYSIS: 
+            if senderid!=self.uid:
+                self.numMessages += 1
         if DEBUG: print("Process ", self.uid, "received ", typemessage, "from " , senderid, "with metadata ", metadata)
         if typemessage=="wakeup":
             self.wakeup()
@@ -83,7 +84,7 @@ class Node:
                 self.findCount +=1
         elif(self.SE[senderEdge]=="Basic"):
             self.queue.put(message)
-            self.numMessages-=1
+            if ANALYSIS: self.numMessages-=1
         else:
             self.queues[senderEdge].put(Message("initiate", [self.LN+1, self.edgeToWeight[senderEdge], "Find"], self.uid))
 
@@ -133,7 +134,7 @@ class Node:
             self.wakeup()
         if level>self.LN:
             self.queue.put(message)
-            self.numMessages-=1
+            if ANALYSIS: self.numMessages-=1
         elif self.FN != fid:
             self.queues[senderEdge].put(Message("accept", [], self.uid))
         else:
@@ -174,7 +175,7 @@ class Node:
             self.report()
         elif self.SN=="Find":
             self.queue.put(message)
-            self.numMessages-=1
+            if ANALYSIS: self.numMessages-=1
         elif weightparam > self.bestWeight:
             self.changeRoot()
         elif weightparam == self.bestWeight and self.bestWeight == float('inf'):
@@ -192,7 +193,10 @@ class Node:
         self.changeRoot()
 
     def queryStatusResponse(self):
-        self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch, self.numMessages-1], self.uid))
+        if ANALYSIS:
+            self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch, self.numMessages-1], self.uid))
+        else:
+            self.masterQueue.put(Message("queryAnswer", [self.SE, self.inBranch], self.uid))
         sys.exit() #MST computed and sent information to master, time to exit
 
 
@@ -278,7 +282,7 @@ if __name__ == '__main__':
             # if DEBUG: print("Got status")
             if DEBUG: print("Got status", recvmessage.typemessage, recvmessage.metadata, recvmessage.senderid)
             SEstatus = recvmessage.metadata[0]
-            numTotalMessages += recvmessage.metadata[2]
+            if ANALYSIS: numTotalMessages += recvmessage.metadata[2]
             for i,j in SEstatus.items():
                 if j=="Branch":
                     mstAdjacencyMatrix[recvmessage.senderid][i] = 1
@@ -305,13 +309,14 @@ if __name__ == '__main__':
     for i in mstEdges:
         print(i)
 
-    # print("Number of messsages is ", numTotalMessages)
-    # print(numTotalMessages)
-    upperLimit = 2*numEdgesReal + math.ceil(5*numNodes*math.log2(numNodes))
-    # print("upper limit is ", upperLimit)
-    # print(upperLimit)
-    print("n, edges, messages, upperlimit, nlogn")
-    print(numNodes,str(","),numEdgesReal,str(","), numTotalMessages,str(","), upperLimit,str(","), int(numNodes*math.log2(numNodes)))
+    if ANALYSIS:
+        # print("Number of messsages is ", numTotalMessages)
+        # print(numTotalMessages)
+        upperLimit = 2*numEdgesReal + math.ceil(5*numNodes*math.log2(numNodes))
+        # print("upper limit is ", upperLimit)
+        # print(upperLimit)
+        print("n, edges, messages, upperlimit, nlogn")
+        print(numNodes,str(","),numEdgesReal,str(","), numTotalMessages,str(","), upperLimit,str(","), int(numNodes*math.log2(numNodes)))
     if DEBUGOUTPUT:
         #kruskal
         from kruskal import Graph
